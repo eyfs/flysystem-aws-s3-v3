@@ -125,12 +125,13 @@ class AwsS3Adapter extends AbstractAdapter
      *
      * @param string $path
      * @param string $newpath
+     * @param Config $config Config object
      *
      * @return bool
      */
-    public function rename($path, $newpath)
+    public function rename($path, $newpath, Config $config)
     {
-        if ( ! $this->copy($path, $newpath)) {
+        if ( ! $this->copy($path, $newpath, $config)) {
             return false;
         }
 
@@ -372,21 +373,30 @@ class AwsS3Adapter extends AbstractAdapter
      *
      * @param string $path
      * @param string $newpath
+     * @param Config   $config Config object
      *
      * @return bool
      */
-    public function copy($path, $newpath)
+    public function copy($path, $newpath, Config $config)
     {
         $visibility = $this->getRawVisibility($path);
 
-        $command = $this->s3Client->getCommand(
-            'copyObject',
-            [
+        $options = $this->getOptionsFromConfig($config);
+
+        $args = [
                 'Bucket' => $this->bucket,
                 'Key' => $this->applyPathPrefix($newpath),
                 'CopySource' => urlencode($this->bucket . '/' . $this->applyPathPrefix($path)),
                 'ACL' => $visibility === AdapterInterface::VISIBILITY_PUBLIC ? 'public-read' : 'private',
-            ]
+            ];
+
+        if (isset($options['ServerSideEncryption'])) {
+            $args['ServerSideEncryption'] = $options['ServerSideEncryption'];
+        }
+
+        $command = $this->s3Client->getCommand(
+            'copyObject',
+            $args
         );
 
         try {
